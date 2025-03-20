@@ -109,7 +109,7 @@ class SetValuedClassification:
             for j in range(len(focals)):
                 gain_tmp=0.0
                 for k in range(len(focals)):
-                    # TODO : change A et B.
+                    # TODO : change A et B (signification).
                     A = Utils.BinaryToClass(Utils.IntegerToBinary(focals[j], nb_classes), nb_classes)
                     B = Utils.BinaryToClass(Utils.IntegerToBinary(focals[k], nb_classes), nb_classes) 
                     inters = list(set( A )  & set( B ) )

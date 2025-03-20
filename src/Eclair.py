@@ -41,13 +41,13 @@ class CustomNaiveBayesClassifier(NaiveBayesClassifier, ICustomClassifier):
 
     def __init__(self,
         categorical_features,
-        numerical_features 
+        numerical_features
     ):
         NaiveBayesClassifier.__init__(self, categorical_features, numerical_features)
 
     # @property TODO: Add property to attribute (understand before).
 
-    def PredictProba(self, 
+    def PredictProba(self,
         X_train: np.ndarray[tuple[int, int], np.dtype[np.float64]],
         X_test: np.ndarray[tuple[int, int], np.dtype[np.float64]],
         y_train: np.ndarray[tuple[int,], np.dtype[np.float64]]
@@ -76,8 +76,8 @@ class CustomNaiveBayesClassifier(NaiveBayesClassifier, ICustomClassifier):
             test_size: float,
             random_state = Union[int, None] # For reproducible output across multiple function calls.
         ) -> tuple[
-            list[np.ndarray[tuple[int, int], np.dtype[np.float64]]], # Posterior probabilities by class and by sample for all splits.
-            list[np.ndarray[tuple[int, int], np.dtype[np.float64]]], # Posterior probabilities by class and by sample for all splits.
+            list[np.ndarray[tuple[int, int], np.dtype[np.float64]]], # Posterior probabilities by class and by sample for each split.
+            list[np.ndarray[tuple[int, int], np.dtype[np.float64]]], # Posterior probabilities by class and by sample for each split.
             list[np.ndarray[tuple[int,], np.dtype[np.int64]]]        # Shape (int,).
         ]:
         """Get posterior probabilities of calibration and test sets for all splits.
@@ -127,6 +127,8 @@ class CustomNaiveBayesClassifier(NaiveBayesClassifier, ICustomClassifier):
 
             return test_probabilities, calibration_probabilities, y_calibration 
         
+        # For a dataset with 6 entries and a split number of 2 here is the return : ([(TRAIN)array([3, 4, 5]), (TEST)array([0, 1, 2])], [(TRAIN)array([0, 1, 2]), (TEST)array([3, 4, 5])]).
+        # It is important to make the kfold without shuffle to keep dataset order in test data.
         X_train_kfold_indices, X_test_kfold_indices = Utils.Kfold(X, nb_folds)
         # Parallelization.
         with Pool() as pool:
@@ -170,7 +172,7 @@ class IEclair(ABC):
     
     @abstractmethod
     def Classify(self):
-        """Classify new samples.
+        """Classify samples with the relabelling process.
         """
         pass
 
@@ -292,12 +294,12 @@ class CrossEntropy(Eclair, IEclair):
     #                                Private methods                               #
     # ---------------------------------------------------------------------------- #
 
-    def _EntropyBasedSubsetReduction(self, 
+    def _EntropyBasedSubsetReduction(self,
         sample_probabilities: np.ndarray[tuple[int,], np.dtype[np.float64]], # Posterior probabilities for one sample.
         threshold: float # Threshold to apply class grouping.
     ) -> list[int]:
         """Get a subset of classes according to their probabilities (higher probabilities) in order to reduce entropy.
-        """        
+        """
         y: list[float] = [] # Keep the sum of probabilities equal.
         z: list[float] = [] # Use to get the higher remaining probability.
         for i in range(len(sample_probabilities)):
@@ -350,7 +352,6 @@ class CrossEntropy(Eclair, IEclair):
     ):
         """Load posterior probabilities from a csv file, shape (n_samples, n_classes).
         """
-
         if not os.path.isfile(path):
             return
         
@@ -369,7 +370,6 @@ class CrossEntropy(Eclair, IEclair):
     ) -> list[int]:
         """Relabelling based on entropy computation.
         """
-        
         new_y: list[int] = [] # New labels: subset in natural numbers.
         for i in range(self.nb_samples):
             sample = self._probabilities[i]
@@ -429,14 +429,12 @@ class CrossEntropy(Eclair, IEclair):
     ):
         """Classify new samples and optimize hyper-parameters.
         """
-
-        def ClassificationOnRelabeledData(
+        def _ClassificationOnRelabeledData(
                 threshold1,
                 threshold2
             ):
             """Predict probabilities on relabelling data.
             """
-
             # Get new y labels.
             new_y = self.Relabelling(threshold1, threshold2)
             # Get masses on the new y labels.
@@ -445,7 +443,7 @@ class CrossEntropy(Eclair, IEclair):
 
         # Parallelization.
         with Pool() as pool:
-            results = pool.starmap(ClassificationOnRelabeledData, [
+            results = pool.starmap(_ClassificationOnRelabeledData, [
                 (i, i) for i in threshold_entropy_space
             ])
         
@@ -652,7 +650,9 @@ class ConformalPrediction(Eclair, IEclair):
         # En fonction renommer new_y en new_y_tmp et mettre new_y ici.
 
         # nb_nyd=len(partiel_y_train_tmp)
-        partiel_y_train = [partiel_y_train_tmp[j] for j in range(nb_nyd) if j not in remove_all ]
+        
+        partiel_y_train = []
+        # partiel_y_train = [partiel_y_train_tmp[j] for j in range(nb_nyd) if j not in remove_all ]
         
         
         # Log.
@@ -699,7 +699,8 @@ if __name__ == '__main__':
     #
     nb_splits = 5
     proba_train, calibration_probabilities, y_calibration = nbc.PredictProbaKFold(x, y, nb_splits, 42)
-    posterior_proba=np.concatenate( [proba_train[j] for j in range(nb_splits)])
+    # Get probabilities of all samples in dataset.
+    posterior_proba = np.concatenate([proba_train[j] for j in range(nb_splits)])
     # OR
     # Divide by train/test.
     posterior_prob = nbc.PredictProba(x, x_cal, y)

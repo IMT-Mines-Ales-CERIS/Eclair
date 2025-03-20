@@ -88,7 +88,7 @@ class Utils:
     @staticmethod
     def Kfold(
         X: np.ndarray[tuple[int, int], np.dtype[np.int64]],
-        nb_folds: int # Must be at least 2.
+        nb_folds: int = 2 # Must be at least 2.
     ) -> tuple[
         list[np.ndarray[tuple[int,], np.dtype[np.int64]]], # The training set indices for all splits.
         list[np.ndarray[tuple[int,], np.dtype[np.int64]]]  # The testing set indices for all splits.

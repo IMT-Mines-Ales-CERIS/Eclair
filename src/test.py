@@ -1,7 +1,9 @@
-from multiprocessing import Pool, TimeoutError
+import numpy as np
 import random
 import time
 import os
+from multiprocessing import Pool, TimeoutError
+from Utils import Utils
 
 def f(x):
     time.sleep(0.75 + random.random())
@@ -12,38 +14,15 @@ def fp(x,y):
     return x+y, x*y
 
 if __name__ == '__main__':
-    num = 10
-    # start = time.time()
-
-    # res = []
-    # for i in range(num):
-    #     res.append(f(i))
-    # print(res)
-
-    # print(f'Time : {time.time() - start}', flush=True)
-
-
-    start = time.time()
-    # # start 4 worker processes
-    with Pool() as pool:
-
-        # print "[0, 1, 4,..., 81]"
-        # res = pool.map(f, range(num))
-        # multi arg
-        res = pool.starmap(fp, [(i, i+1) for i in range(num)])
-        print(res)
-        
-    print(f'Time : {time.time() - start}', flush=True)
-
-    start = time.time()
-    # # start 4 worker processes
-    with Pool(processes=4) as pool:
-
-        # print "[0, 1, 4,..., 81]"
-        res = pool.imap_unordered(f, range(num))
-        print(list(res))
-        
-    print(f'Time : {time.time() - start}', flush=True)
+    x = np.array([
+        [1, 2, 3, 6],
+        [4, 5, 6, 15],
+        [7, 8, 9, 24],
+        [10, 11, 12, 33],
+        [10, 20, 30, 60],
+        [40, 50, 60, 150]
+    ])
+    print(Utils.Kfold(x))
 
     # print()
 

@@ -3,9 +3,14 @@ import numpy as np
 class NaiveBayesClassifier:
 
     def __init__(self,
-        categorical_features,
-        numerical_features
+        categorical_features: np.ndarray[tuple[int,], np.dtype[np.int64]],
+        numerical_features: np.ndarray[tuple[int,], np.dtype[np.int64]]
     ):
+        """
+        ### Parameters :
+            * ``categorical_features`` - Indexes of categorical features (discrete values).
+            * ``numerical_features`` - Indexes of numerical features (continuous values).
+        """
         self._categorical_features = categorical_features
         self._numerical_features = numerical_features
 
@@ -76,7 +81,7 @@ class NaiveBayesClassifier:
             freq_ic: list[list[float]] = []
             for cat_f in range(len(self._categorical_features)):
                 lev_tmp, counts_tmp = np.unique([
-                    x_train[k, self._categorical_features[cat_f]]  for k in range(nb_samples) if (y_train[k]==distinct_classes[ic])
+                    x_train[k, self._categorical_features[cat_f]] for k in range(nb_samples) if (y_train[k]==distinct_classes[ic])
                 ], return_counts=True)
                 lev_ic.append(lev_tmp)
                 freq_ic.append([counts_tmp[t] / np.sum(counts_tmp) for t in range(len(counts_tmp))])
