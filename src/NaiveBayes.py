@@ -2,19 +2,8 @@ import numpy as np
 
 class NaiveBayesClassifier:
 
-    def __init__(self,
-        categorical_features: np.ndarray[tuple[int,], np.dtype[np.int64]],
-        numerical_features: np.ndarray[tuple[int,], np.dtype[np.int64]]
-    ):
-        """
-        ### Parameters :
-            * ``categorical_features`` - Indexes of categorical features (discrete values).
-            * ``numerical_features`` - Indexes of numerical features (continuous values).
-        """
-        self._categorical_features = categorical_features
-        self._numerical_features = numerical_features
-
-        # TODO: A CONFIRMER SI CAT_FEAT et NUM_FEAT dependent ou non du jeu de données (sinon mettre en argument ?).
+    def __init__(self):
+        pass
 
     # ---------------------------------------------------------------------------- #
     #                                Private methods                               #
@@ -45,14 +34,18 @@ class NaiveBayesClassifier:
     # ---------------------------------------------------------------------------- #
 
     def FitContinuousModel(self,
-        x_train: np.ndarray[tuple[int, int], np.dtype[np.float64]],
+        X_train: np.ndarray[tuple[int, int], np.dtype[np.float64]],
         y_train: np.ndarray[tuple[int, int], np.dtype[np.int64]],
+        categorical_features: np.ndarray[tuple[int,], np.dtype[np.int64]],
+        numerical_features: np.ndarray[tuple[int,], np.dtype[np.int64]],
         probability_type: str = 'gaussian'
     ):
         """
         ### Parameters :
-            * ``x_train`` - Shape, (n_samples, n_features).
+            * ``X_train`` - Shape, (n_samples, n_features).
             * ``y_train`` - Shape, (n_samples,).
+            * ``categorical_features`` - Indexes of categorical features (discrete values).
+            * ``numerical_features`` - Indexes of numerical features (continuous values).
             * ``probability_type`` - Type of probabilities, default "*gaussian*".
         """
         nb_samples = len(y_train)
@@ -63,15 +56,15 @@ class NaiveBayesClassifier:
             mu = [
                 [
                     np.mean([
-                        x_train[i, self._numerical_features[j]] for i in range(nb_samples) if (y_train[i] == distinct_classes[k])
-                    ]) for j in range(len(self._numerical_features))
+                        X_train[i, numerical_features[j]] for i in range(nb_samples) if (y_train[i] == distinct_classes[k])
+                    ]) for j in range(len(numerical_features))
                 ] for k in range(nb_classes)
             ]
             sigma2 = [
                 [
                     np.std([
-                        x_train[i,self._numerical_features[j]] for i in range(nb_samples) if (y_train[i] == distinct_classes[k])
-                    ]) for j in range(len(self._numerical_features))
+                        X_train[i, numerical_features[j]] for i in range(nb_samples) if (y_train[i] == distinct_classes[k])
+                    ]) for j in range(len(numerical_features))
                 ] for k in range(nb_classes)]
         # Categorical features 
         lev = []
@@ -79,9 +72,9 @@ class NaiveBayesClassifier:
         for ic in range(nb_classes):
             lev_ic: list[np.ndarray[tuple[int,], np.dtype[np.float64]]] = []
             freq_ic: list[list[float]] = []
-            for cat_f in range(len(self._categorical_features)):
+            for cat_f in range(len(categorical_features)):
                 lev_tmp, counts_tmp = np.unique([
-                    x_train[k, self._categorical_features[cat_f]] for k in range(nb_samples) if (y_train[k]==distinct_classes[ic])
+                    X_train[k, categorical_features[cat_f]] for k in range(nb_samples) if (y_train[k]==distinct_classes[ic])
                 ], return_counts=True)
                 lev_ic.append(lev_tmp)
                 freq_ic.append([counts_tmp[t] / np.sum(counts_tmp) for t in range(len(counts_tmp))])
@@ -97,7 +90,9 @@ class NaiveBayesClassifier:
         return mu, sigma2, class_rate, distinct_classes, lev, freq, utilities
     
     def Predict(self,
-        x_test: np.ndarray[tuple[int, int], np.dtype[np.float64]],
+        X_test: np.ndarray[tuple[int, int], np.dtype[np.float64]],
+        categorical_features: np.ndarray[tuple[int,], np.dtype[np.int64]],
+        numerical_features: np.ndarray[tuple[int,], np.dtype[np.int64]],
         mu,
         sigma2,
         nc,
@@ -108,26 +103,29 @@ class NaiveBayesClassifier:
     ) -> np.ndarray[tuple[int, int], np.dtype[np.float64]]: # Shape (n_sample, n_classes).
         """
         ### Parameters :
+            * ``X_test`` - Shape, (n_samples, n_features).
+            * ``categorical_features`` - Indexes of categorical features (discrete values).
+            * ``numerical_features`` - Indexes of numerical features (continuous values).
         """
         nb_classes = len(classes)
-        nb_test_samples = len(x_test)
+        nb_test_samples = len(X_test)
         preds_proba_sm = np.zeros((nb_test_samples, nb_classes))
         preds_proba = np.zeros((nb_test_samples, nb_classes))
         preds_bo = []
         preds_eu = []
-        nba = len(self._numerical_features) + len(self._categorical_features)
+        nba = len(numerical_features) + len(categorical_features)
         for ir in range(nb_test_samples):
             z=[]
             for ia in range(nba):
-                z.append(x_test[ir][ia])
+                z.append(X_test[ir][ia])
             pic = []
             max_pic = 0
             for ic in range(nb_classes):
                 pic_tmp = nc[ic]
-                for i_nf in range(len(self._numerical_features)):
-                    pic_tmp *= self._Gaussian(z[self._numerical_features[i_nf]], mu[ic][i_nf], sigma2[ic][i_nf])
-                for i_cf in range(len(self._categorical_features)):
-                    idx = np.where(np.array(lev[ic][i_cf]) == z[self._categorical_features[i_cf]])
+                for i_nf in range(len(numerical_features)):
+                    pic_tmp *= self._Gaussian(z[numerical_features[i_nf]], mu[ic][i_nf], sigma2[ic][i_nf])
+                for i_cf in range(len(categorical_features)):
+                    idx = np.where(np.array(lev[ic][i_cf]) == z[categorical_features[i_cf]])
                     if(len(idx[0])==0):
                         pic_tmp *= 10**-10
                     else :

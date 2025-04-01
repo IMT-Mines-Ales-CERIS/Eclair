@@ -7,12 +7,277 @@ from abc import ABC, abstractmethod
 from multiprocessing import Pool
 from scipy.stats import entropy
 from sklearn.metrics import accuracy_score
+from sklearn.model_selection import KFold
 from sklearn.model_selection import train_test_split
 from typing import Union
 
 from NaiveBayes import NaiveBayesClassifier
-from Utils import Utils
-from SetValuedClassification import SetValuedClassification
+
+
+# 888     888 888    d8b 888          
+# 888     888 888    Y8P 888          
+# 888     888 888        888          
+# 888     888 888888 888 888 .d8888b  
+# 888     888 888    888 888 88K      
+# 888     888 888    888 888 "Y8888b. 
+# Y88b. .d88P Y88b.  888 888      X88 
+#  "Y88888P"   "Y888 888 888  88888P'                                     
+
+class Utils:
+
+    @staticmethod
+    def BinaryToClass (
+        binaries: list[bool],
+        length: int # TODO: pourquoi ajouter length et ne pas utiliser simplement len(binaries) ?
+    ) -> list[int]:
+        """Get classes (indexes) with a True value in a boolean list.
+
+        ### Parameters :
+            * ``binaries`` - List of boolean.
+            * length ?
+
+        ### Return :
+            * ``classes`` - List of classes according to index of True elements.
+        """
+        classes = []
+        for i in range(length):
+            if binaries[i]:
+                classes.append(i)
+        return classes
+    
+    @staticmethod
+    def BinaryToInteger(
+        binaries: list[bool]
+    ) -> int:
+        """Convert a list of boolean to an integer.
+        """
+        integer = 0
+        for i in range(len(binaries)):
+            integer += int(binaries[i]) * 2**i
+        return integer
+    
+    @staticmethod
+    def GetBeliefPlausibility(
+        focals,
+        m,
+        nb_classes
+    ) -> tuple[
+        list[float],
+        list[float],
+        list[float]
+    ]:
+        """Get bel, pl, pig from body of evidence.
+        """
+        pl  = [0.0] * nb_classes
+        bel = [0.0] * nb_classes
+        pig = [0.0] * nb_classes
+        for i in range (len(focals)):
+            bF_tmp = Utils.IntegerToBinary(focals[i], nb_classes) # Binary vector of F[i].
+            for j in range (nb_classes):
+                # TODO: k in [j] ??
+                # TODO: Enlever +1.
+                bC_tmp = [k in [j+1] for k in range(1,nb_classes+1)]#binary vector of class j
+                if bF_tmp[j] == bC_tmp[j]: # j in F[i]
+                    pl[j] += m[i]
+                    pig[j] += m[i]/(np.sum(bF_tmp))
+                    if np.sum(bF_tmp) == 1: # [j] equal to F[i]
+                        bel[j] = m[i]
+        return bel, pl, pig
+
+    @staticmethod
+    def IntegerToBinary(
+        integer: int,
+        length: int
+    ):
+        """Convert an integer to a boolean list (presence and absence of each class).
+        """
+        # Init a list of False values of length "length".
+        binaries = [False] * length
+        for i in reversed(range(length)):
+            binaries[i] = (integer // 2**i ) == 1 # When dividing two numbers using this // operator, the result will always be an integer, ignoring the decimal part of the result.
+            integer = integer % 2**i
+        return binaries
+    
+    @staticmethod
+    def Kfold(
+        X: np.ndarray[tuple[int, int], np.dtype[np.int64]],
+        nb_folds: int = 2 # Must be at least 2.
+    ) -> tuple[
+        list[np.ndarray[tuple[int,], np.dtype[np.int64]]], # The training set indices for all splits.
+        list[np.ndarray[tuple[int,], np.dtype[np.int64]]]  # The testing set indices for all splits.
+    ]:
+        """Provides train/test indices to split data in train/test sets. Split dataset into k consecutive folds (without shuffling).
+        """
+        kf = KFold(n_splits = nb_folds)
+        X_train = []
+        X_test = []
+        for _, (train_index, test_index) in enumerate(kf.split(X)):
+            X_train.append(train_index)
+            X_test.append(test_index)
+        
+        return X_train, X_test
+    
+    @staticmethod
+    def ProbabilityToBelief(
+        p, #TODO: shape(int, ) ? Juste pour un sample.
+        selflevels
+    ) -> tuple[
+        list, # TODO float ou int. Utils.IntegerToBinary(F[i] ... donc int ?
+        list[float]
+    ]:
+        """Get body of evidence (F, M) from masses p.
+        """
+        focals = [] # Focal elements.
+        masses = [] # Masses associated to focal elements.
+        for i in range (len(p)):
+            if p[i] > 10**(-4):
+                focals.append(selflevels[i])
+                masses.append(p[i])
+        masses = list(masses / np.sum(masses))
+        return focals, masses
+
+
+
+
+
+
+
+
+
+
+#  .d8888b.           888    888     888         888                        888 
+# d88P  Y88b          888    888     888         888                        888 
+# Y88b.               888    888     888         888                        888 
+#  "Y888b.    .d88b.  888888 Y88b   d88P 8888b.  888 888  888  .d88b.   .d88888 
+#     "Y88b. d8P  Y8b 888     Y88b d88P     "88b 888 888  888 d8P  Y8b d88" 888 
+#       "888 88888888 888      Y88o88P  .d888888 888 888  888 88888888 888  888 
+# Y88b  d88P Y8b.     Y88b.     Y888P   888  888 888 Y88b 888 Y8b.     Y88b 888 
+#  "Y8888P"   "Y8888   "Y888     Y8P    "Y888888 888  "Y88888  "Y8888   "Y88888 
+                                                                              
+class SetValuedClassification:
+
+    @staticmethod
+    def SetValuedClassEvaluation(
+        truth: list[int],
+        pred: list[list[int]] # TODO: int ou float ?
+    ) -> tuple[
+        float,
+        float,
+        float,
+        float,
+        float
+    ]:
+        """
+        ### Parameters :
+            * ``truth`` - Contains indices of example classes.
+            * ``pred`` - Contains subsets of elements from 0 to nb_classes - 1.
+        ### Returns :
+            * acc
+            * u50
+            * u65
+            * u80
+            * acc_imp
+        """
+        acc = 0.0
+        u50 = 0.0
+        u65 = 0.0
+        u80 = 0.0
+        acc_imp = 0.0
+        if len(truth) != len(pred):
+            print('truth and pred must have the same length')
+        else:
+            inPred = [0.0] * len(truth)
+            z = [0.0] * len(truth)
+            z65 = [0.0] * len(truth)
+            z80 = [0.0] * len(truth)
+            z_acc = [0.0] * len(truth)
+            for i in range(len(truth)):
+                # TODO: ==[True] ?? Pourquoi passer par un tableau ? Pk pas truth[i] in pred[i] ?
+                if len(pred[i]) > 0 and [k in pred[i] for k in [truth[i]]] == [True]:
+                    inPred[i] = 1.0
+                    z[i] = 1.0/len(pred[i])
+                    z65[i] = -0.6*(z[i]**2)+1.6*z[i]
+                    z80[i] = -1.2*(z[i]**2)+2.2*z[i]
+                    if len(pred[i])==1:
+                        z_acc[i] = 1.0
+            acc = np.sum(z_acc) / len(truth)
+            u50 = np.sum(z) / len(truth)
+            u65 = np.sum(z65) / len(truth)
+            u80 = np.sum(z80) / len(truth)
+            acc_imp = np.sum(inPred) / len(truth)
+             
+        return acc, u50, u65, u80, acc_imp
+    
+    @staticmethod
+    def PignisticCriterion(
+        m_test,
+        selflevels,
+        nb_classes: int
+    ) -> list[int]:
+        pred = []
+        for i in range(len(m_test)):
+            focals, masses = Utils.ProbabilityToBelief(m_test[i], selflevels)
+            *_, pig = Utils.GetBeliefPlausibility(focals, masses, nb_classes)
+            max_pig = np.max(pig)
+            pred.append([j for j in range(len(pig)) if pig[j] >= max_pig])
+        return pred
+
+    @staticmethod
+    def StrongDominance(
+        m_test,
+        selflevels,
+        nb_classes: int
+    ) -> list[list[int]]:
+        pred = []
+        for i in range (len(m_test)):
+            N = [False] * nb_classes # TODO: que veux dire N.
+            focals, masses = Utils.ProbabilityToBelief(m_test[i], selflevels)
+            bel, pl, _ = Utils.GetBeliefPlausibility(focals, masses, nb_classes)
+            for a in range (nb_classes):
+                comp=0
+                for b in range (nb_classes):
+                    if(a!=b):
+                        if(  (bel[b] >= pl[a]) ):
+                            break
+                        else:
+                            comp+=1
+                if( (comp==(nb_classes-1)) ):
+                    N[a]=True
+            pred.append(Utils.BinaryToClass(N,nb_classes))
+        return pred
+    
+    @staticmethod
+    def EclairGFBeta(
+        m_test,
+        selflevels,
+        beta,
+        nb_classes
+    ):
+        pred=[]
+        for i in range (len(m_test)):
+            focals, masses = Utils.ProbabilityToBelief(m_test[i], selflevels)
+            bel, pl, pig = Utils.GetBeliefPlausibility(focals, masses, nb_classes) # TODO : Aucun des éléments utilisés ?
+            gain = []
+            for j in range(len(focals)):
+                gain_tmp=0.0
+                for k in range(len(focals)):
+                    # TODO : change A et B (signification).
+                    A = Utils.BinaryToClass(Utils.IntegerToBinary(focals[j], nb_classes), nb_classes)
+                    B = Utils.BinaryToClass(Utils.IntegerToBinary(focals[k], nb_classes), nb_classes) 
+                    inters = list(set( A )  & set( B ) )
+                    f_beta = ((1 + beta**2) * len(inters)) / (((beta**2) * len(B)) + len(A))
+                    gain_tmp = gain_tmp+f_beta * masses[k]
+                gain.append(gain_tmp)
+            pred.append(Utils.BinaryToClass(Utils.IntegerToBinary(focals[np.argmax(gain)],nb_classes), nb_classes))
+        return pred
+
+
+
+
+
+
+
+
 
 
 #  .d8888b.                    888                           .d8888b.  888                            d8b  .d888 d8b                  
@@ -35,30 +300,36 @@ class ICustomClassifier(ABC):
     # TODO: A voir si on ne met pas aussi PredictProbaKFold (et peut être KFold en method de cette classe ?).
 
 
-# TODO: hériter de NaiveBayesClassifier et modifier Predict et Fitting.
-
 class CustomNaiveBayesClassifier(NaiveBayesClassifier, ICustomClassifier):
 
-    def __init__(self,
-        categorical_features,
-        numerical_features
-    ):
-        NaiveBayesClassifier.__init__(self, categorical_features, numerical_features)
+    def __init__(self):
+        NaiveBayesClassifier.__init__(self)
 
     # @property TODO: Add property to attribute (understand before).
 
     def PredictProba(self,
         X_train: np.ndarray[tuple[int, int], np.dtype[np.float64]],
         X_test: np.ndarray[tuple[int, int], np.dtype[np.float64]],
-        y_train: np.ndarray[tuple[int,], np.dtype[np.float64]]
+        y_train: np.ndarray[tuple[int,], np.dtype[np.float64]],
+        categorical_features: np.ndarray[tuple[int,], np.dtype[np.int64]],
+        numerical_features: np.ndarray[tuple[int,], np.dtype[np.int64]]
     ) -> np.ndarray[tuple[int, int], np.dtype[np.float64]]: # Shape (n_sample, n_classes).
         """Predict posterior probabilities on X_test based on X_train fitting parameters.
+        
+        ### Parameters :
+            * ``X_train`` - Shape, (n_train_samples, n_features).
+            * ``X_test`` - Shape, (n_test_samples, n_features).
+            * ``y_train`` - Shape, (n_samples,).
+            * ``categorical_features`` - Indexes of categorical features (discrete values).
+            * ``numerical_features`` - Indexes of numerical features (continuous values).
         """
         # Get fitting parameters from training set.
-        mu, sigma2, nc, classes, lev, freq, u = self.FitContinuousModel(X_train, y_train, 'gaussian')
+        mu, sigma2, nc, classes, lev, freq, u = self.FitContinuousModel(X_train, y_train, categorical_features, numerical_features, 'gaussian')
         # Predict probabilities on X_test based on fitting parameters.
         *_, posterior_probabilities = self.Predict(
             X_test,
+            categorical_features,
+            numerical_features,
             mu,
             sigma2,
             nc,
@@ -70,21 +341,35 @@ class CustomNaiveBayesClassifier(NaiveBayesClassifier, ICustomClassifier):
         return posterior_probabilities
     
     def PredictProbaKFold(self,
-            X: np.ndarray[tuple[int, int], np.dtype[np.float64]], # Dataset, shape (n_samples, n_features).
-            y: np.ndarray[tuple[int,], np.dtype[np.float64]], # Labels.
+            X: np.ndarray[tuple[int, int], np.dtype[np.float64]],
+            y: np.ndarray[tuple[int,], np.dtype[np.float64]],
+            categorical_features: np.ndarray[tuple[int,], np.dtype[np.int64]],
+            numerical_features: np.ndarray[tuple[int,], np.dtype[np.int64]],
             nb_folds: int,
             test_size: float,
-            random_state = Union[int, None] # For reproducible output across multiple function calls.
+            random_state = Union[int, None]
         ) -> tuple[
-            list[np.ndarray[tuple[int, int], np.dtype[np.float64]]], # Posterior probabilities by class and by sample for each split.
-            list[np.ndarray[tuple[int, int], np.dtype[np.float64]]], # Posterior probabilities by class and by sample for each split.
-            list[np.ndarray[tuple[int,], np.dtype[np.int64]]]        # Shape (int,).
+            list[np.ndarray[tuple[int, int], np.dtype[np.float64]]],
+            list[np.ndarray[tuple[int, int], np.dtype[np.float64]]],
+            list[np.ndarray[tuple[int,], np.dtype[np.int64]]]
         ]:
         """Get posterior probabilities of calibration and test sets for all splits.
 
         ### Parameters :
-            * ``posterior_probabilities`` - Posterior probabilities by class and by sample for all splits.
+            * ``X`` - Dataset, shape, (n_samples, n_features).
+            * ``y`` - Labels, shape, (n_samples,).
+            * ``categorical_features`` - Indexes of categorical features (discrete values).
+            * ``numerical_features`` - Indexes of numerical features (continuous values).
+            * ``nb_folds``: Number of folds, must be at least 2.
+            * ``test_size``: Should be between 0.0 and 1.0 and represent the proportion of the dataset to include in the test split.
+            * ``random_state``: Controls the shuffling applied to the data before applying the train_test_split function.
+        
+        ### Returns :
+            * ``list`` - Posterior probabilities on test sets for each split.
+            * ``list`` - Posterior probabilities on calibration sets for each split.
+            * ``list`` - Labels for the calibration sets for each split.
         """
+
         def _Classifier(
                 X_train_indices: np.ndarray[tuple[int,], np.dtype[np.int64]], # The training set indices for one split.
                 X_test_indices:  np.ndarray[tuple[int,], np.dtype[np.int64]]  # The testing set indices for one split.
@@ -102,10 +387,12 @@ class CustomNaiveBayesClassifier(NaiveBayesClassifier, ICustomClassifier):
                 random_state = random_state
             )
             
-            mu, sigma2, nc, classes, lev, freq, u = self.FitContinuousModel(X_train, y_train, 'gaussian')
+            mu, sigma2, nc, classes, lev, freq, u = self.FitContinuousModel(X_train, y_train, categorical_features, numerical_features, 'gaussian')
             
             *_, calibration_probabilities = self.Predict(
                 X_calibration,
+                categorical_features,
+                numerical_features,
                 mu,
                 sigma2,
                 nc,
@@ -116,6 +403,8 @@ class CustomNaiveBayesClassifier(NaiveBayesClassifier, ICustomClassifier):
             )
             *_, test_probabilities = self.Predict(
                 X[X_test_indices, :],
+                categorical_features,
+                numerical_features,
                 mu,
                 sigma2,
                 nc,
