@@ -35,7 +35,7 @@ class NaiveBayesClassifier:
 
     def FitContinuousModel(self,
         X_train: np.ndarray[tuple[int, int], np.dtype[np.float64]],
-        y_train: np.ndarray[tuple[int, int], np.dtype[np.int64]],
+        y_train: np.ndarray[tuple[int,], np.dtype[np.int64]],
         categorical_features: np.ndarray[tuple[int,], np.dtype[np.int64]],
         numerical_features: np.ndarray[tuple[int,], np.dtype[np.int64]],
         probability_type: str = 'gaussian'
