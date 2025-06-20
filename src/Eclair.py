@@ -6,6 +6,7 @@ import os
 from abc import ABC, abstractmethod
 from multiprocessing import Pool
 from scipy.stats import entropy
+from sklearn.datasets import load_iris
 from sklearn.metrics import accuracy_score
 from sklearn.model_selection import KFold
 from sklearn.model_selection import train_test_split
@@ -93,6 +94,7 @@ class Utils:
         """
         # Init a list of False values of length "length".
         binaries = [False] * length
+        print(length)
         for i in reversed(range(length)):
             binaries[i] = (integer // 2**i ) == 1 # When dividing two numbers using this // operator, the result will always be an integer, ignoring the decimal part of the result.
             integer = integer % 2**i
@@ -113,8 +115,7 @@ class Utils:
         X_test = []
         for _, (train_index, test_index) in enumerate(kf.split(X)):
             X_train.append(train_index)
-            X_test.append(test_index)
-        
+            X_test.append(test_index)        
         return X_train, X_test
     
     @staticmethod
@@ -158,7 +159,7 @@ class SetValuedClassification:
 
     @staticmethod
     def SetValuedClassEvaluation(
-        truth: list[int],
+        truth: np.ndarray[tuple[int,], np.dtype[np.int64]],
         pred: list[list[int]] # TODO: int ou float ?
     ) -> tuple[
         float,
@@ -213,7 +214,7 @@ class SetValuedClassification:
         m_test,
         selflevels,
         nb_classes: int
-    ) -> list[int]:
+    ) -> list[list[int]]:
         pred = []
         for i in range(len(m_test)):
             focals, masses = Utils.ProbabilityToBelief(m_test[i], selflevels)
@@ -308,81 +309,38 @@ class CustomNaiveBayesClassifier(NaiveBayesClassifier, ICustomClassifier):
 
     # @property TODO: Add property to attribute (understand before).
 
-    def PredictProba(self,
-        X_train: np.ndarray[tuple[int, int], np.dtype[np.float64]],
-        X_test: np.ndarray[tuple[int, int], np.dtype[np.float64]],
-        y_train: np.ndarray[tuple[int,], np.dtype[np.int64]],
-        **kwargs
-    ) -> np.ndarray[tuple[int, int], np.dtype[np.float64]]: # Shape (n_sample, n_classes).
-        """Predict posterior probabilities on X_test based on X_train fitting parameters.
-        
-        ### Parameters :
-            * ``X_train`` - Shape, (n_train_samples, n_features).
-            * ``X_test`` - Shape, (n_test_samples, n_features).
-            * ``y_train`` - Shape, (n_samples,).
-            * ``categorical_features`` - Indexes of categorical features (discrete values).
-            * ``numerical_features`` - Indexes of numerical features (continuous values).
-        """
-
-        categorical_features: np.ndarray[tuple[int,], np.dtype[np.int64]] = kwargs['categorical_features'] if 'categorical_features' in kwargs else np.array([])
-        numerical_features: np.ndarray[tuple[int,], np.dtype[np.int64]] = kwargs['numerical_features'] if 'numerical_features' in kwargs else np.array([])
-
-        # Get fitting parameters from training set.
-        mu, sigma2, nc, classes, lev, freq, u = self.FitContinuousModel(X_train, y_train, categorical_features, numerical_features, 'gaussian')
-        # Predict probabilities on X_test based on fitting parameters.
-        *_, posterior_probabilities = self.Predict(
-            X_test,
+    def _ClassifierKFold(
+            self,
+            X,
+            y,
+            X_train_indices: np.ndarray[tuple[int,], np.dtype[np.int64]], # The training set indices for one split.
+            X_test_indices:  np.ndarray[tuple[int,], np.dtype[np.int64]],  # The testing set indices for one split.
             categorical_features,
             numerical_features,
-            mu,
-            sigma2,
-            nc,
-            classes,
-            lev,
-            freq,
-            u
-        )
-        return posterior_probabilities
-    
-    def PredictProbaKFold(self,
-            X: np.ndarray[tuple[int, int], np.dtype[np.float64]],
-            y: np.ndarray[tuple[int,], np.dtype[np.float64]],
-            categorical_features: np.ndarray[tuple[int,], np.dtype[np.int64]],
-            numerical_features: np.ndarray[tuple[int,], np.dtype[np.int64]],
-            nb_folds: int,
-            test_size: float,
-            random_state: Union[int, None]
+            test_size,
+            random_state
         ) -> tuple[
-            list[np.ndarray[tuple[int, int], np.dtype[np.float64]]],
-            list[np.ndarray[tuple[int, int], np.dtype[np.float64]]],
-            list[np.ndarray[tuple[int,], np.dtype[np.int64]]]
+            np.ndarray[tuple[int, int], np.dtype[np.float64]], # Posterior probabilities on calibration part by class and by sample for one split.
+            np.ndarray[tuple[int, int], np.dtype[np.float64]], # Posterior probabilities on test part by class and by sample for one split.
+            np.ndarray[tuple[int,], np.dtype[np.int64]],       # Classes on the calibration split for that split.
         ]:
-        """Get posterior probabilities of calibration and test sets for all splits.
-
-        ### Parameters :
-            * ``X`` - Dataset, shape, (n_samples, n_features).
-            * ``y`` - Labels, shape, (n_samples,).
-            * ``categorical_features`` - Indexes of categorical features (discrete values).
-            * ``numerical_features`` - Indexes of numerical features (continuous values).
-            * ``nb_folds``: Number of folds, must be at least 2.
-            * ``test_size``: Should be between 0.0 and 1.0 and represent the proportion of the dataset to include in the test split.
-            * ``random_state``: Controls the shuffling applied to the data before applying the train_test_split function.
-        
-        ### Returns :
-            * ``list`` - Posterior probabilities on test sets for each split.
-            * ``list`` - Posterior probabilities on calibration sets for each split.
-            * ``list`` - Labels for the calibration sets for each split.
-        """
-
-        def _Classifier(
-                X_train_indices: np.ndarray[tuple[int,], np.dtype[np.int64]], # The training set indices for one split.
-                X_test_indices:  np.ndarray[tuple[int,], np.dtype[np.int64]]  # The testing set indices for one split.
-            ) -> tuple[
-                np.ndarray[tuple[int, int], np.dtype[np.float64]], # Posterior probabilities on calibration part by class and by sample for one split.
-                np.ndarray[tuple[int, int], np.dtype[np.float64]], # Posterior probabilities on test part by class and by sample for one split.
-                np.ndarray[tuple[int,], np.dtype[np.int64]],       # Classes on the calibration split for that split.
-            ]:
             """Get posterior probabilities from naive bayes classifier for one split.
+
+            ### Parameters :
+                * ``X`` - Dataset, shape, (n_samples, n_features).
+                * ``y`` - Labels, shape, (n_samples,).
+                * ``X_train_indices`` - X indexes to select for train.
+                * ``X_test_indices`` - X indexes to select for test.
+                * ``categorical_features`` - Indexes of categorical features (discrete values).
+                * ``numerical_features`` - Indexes of numerical features (continuous values).
+                * ``nb_folds``: Number of folds, must be at least 2.
+                * ``test_size``: Should be between 0.0 and 1.0 and represent the proportion of the dataset to include in the test split.
+                * ``random_state``: Controls the shuffling applied to the data before applying the train_test_split function.
+            
+            ### Returns :
+                * ``list`` - Posterior probabilities on test sets for one split.
+                * ``list`` - Posterior probabilities on calibration sets for one split.
+                * ``list`` - Labels for the calibration sets for one split.
             """
 
             X_train, X_calibration, y_train, y_calibration = train_test_split(
@@ -419,7 +377,73 @@ class CustomNaiveBayesClassifier(NaiveBayesClassifier, ICustomClassifier):
                 u
             )
 
-            return test_probabilities, calibration_probabilities, y_calibration 
+            return test_probabilities, calibration_probabilities, y_calibration
+
+    def PredictProba(self,
+        X_train: np.ndarray[tuple[int, int], np.dtype[np.float64]],
+        X_test: np.ndarray[tuple[int, int], np.dtype[np.float64]],
+        y_train: np.ndarray[tuple[int,], np.dtype[np.int64]],
+        **kwargs
+    ) -> np.ndarray[tuple[int, int], np.dtype[np.float64]]: # Shape (n_sample, n_classes).
+        """Predict posterior probabilities on X_test based on X_train fitting parameters.
+        
+        ### Parameters :
+            * ``X_train`` - Shape, (n_train_samples, n_features).
+            * ``X_test`` - Shape, (n_test_samples, n_features).
+            * ``y_train`` - Shape, (n_samples,).
+            * ``categorical_features`` - Indexes of categorical features (discrete values).
+            * ``numerical_features`` - Indexes of numerical features (continuous values).
+        """
+
+        categorical_features: np.ndarray[tuple[int,], np.dtype[np.int64]] = kwargs['categorical_features'] if 'categorical_features' in kwargs else np.array([])
+        numerical_features: np.ndarray[tuple[int,], np.dtype[np.int64]] = kwargs['numerical_features'] if 'numerical_features' in kwargs else np.array([])
+
+        # Get fitting parameters from training set.
+        mu, sigma2, nc, classes, lev, freq, u = self.FitContinuousModel(X_train, y_train, categorical_features, numerical_features, 'gaussian')
+        # Predict probabilities on X_test based on fitting parameters.
+        *_, posterior_probabilities = self.Predict(
+            X_test,
+            categorical_features,
+            numerical_features,
+            mu,
+            sigma2,
+            nc,
+            classes,
+            lev,
+            freq,
+            u
+        )
+        return posterior_probabilities
+
+    def PredictProbaKFold(self,
+            X: np.ndarray[tuple[int, int], np.dtype[np.float64]],
+            y: np.ndarray[tuple[int,], np.dtype[np.float64]],
+            categorical_features: np.ndarray[tuple[int,], np.dtype[np.int64]],
+            numerical_features: np.ndarray[tuple[int,], np.dtype[np.int64]],
+            nb_folds: int,
+            test_size: float,
+            random_state: Union[int, None]
+        ) -> tuple[
+            list[np.ndarray[tuple[int, int], np.dtype[np.float64]]],
+            list[np.ndarray[tuple[int, int], np.dtype[np.float64]]],
+            list[np.ndarray[tuple[int,], np.dtype[np.int64]]]
+        ]:
+        """Get posterior probabilities of calibration and test sets for all splits.
+
+        ### Parameters :
+            * ``X`` - Dataset, shape, (n_samples, n_features).
+            * ``y`` - Labels, shape, (n_samples,).
+            * ``categorical_features`` - Indexes of categorical features (discrete values).
+            * ``numerical_features`` - Indexes of numerical features (continuous values).
+            * ``nb_folds``: Number of folds, must be at least 2.
+            * ``test_size``: Should be between 0.0 and 1.0 and represent the proportion of the dataset to include in the test split.
+            * ``random_state``: Controls the shuffling applied to the data before applying the train_test_split function.
+        
+        ### Returns :
+            * ``list`` - Posterior probabilities on test sets for each split.
+            * ``list`` - Posterior probabilities on calibration sets for each split.
+            * ``list`` - Labels for the calibration sets for each split.
+        """
         
         # For a dataset with 6 entries and a split number of 2 here is the return : ([(TRAIN)array([3, 4, 5]), (TEST)array([0, 1, 2])], [(TRAIN)array([0, 1, 2]), (TEST)array([3, 4, 5])]).
         # It is important to make the kfold without shuffle to keep dataset order in test data.
@@ -427,20 +451,56 @@ class CustomNaiveBayesClassifier(NaiveBayesClassifier, ICustomClassifier):
         # Parallelization.
         with Pool() as pool:
             results = pool.starmap(
-                _Classifier, [
-                    (X_train_kfold_indices[k], X_test_kfold_indices[k])
+                self._ClassifierKFold, [
+                    (
+                        X,
+                        y,
+                        X_train_kfold_indices[k],
+                        X_test_kfold_indices[k],
+                        categorical_features,
+                        numerical_features,
+                        test_size,
+                        random_state
+                    )
                     for k in range(nb_folds)
                 ]
             )
+
             test_probabilities = list(map(lambda item: item[0], results))
             calibration_probabilities = list(map(lambda item: item[1], results))
             y_calibration = list(map(lambda item: item[2], results))
 
+            # results = [
+            #     self._ClassifierKFold(
+            #         X,
+            #         y,
+            #         X_train_kfold_indices[0],
+            #         X_test_kfold_indices[0],
+            #         categorical_features,
+            #         numerical_features,
+            #         test_size,
+            #         random_state
+            #     )
+            # ]
+
+            # [0] TODO: [[1.], [1.], [1.]]
+            # [1] TODO: pourquoi on obtient un test_probabilites = [[0.5, 0.5], [0.5, 0.5], [0.5, 0.5]]
+                        
+            # print()
+
+            # print(X_train_kfold_indices[0])
+            # print(X_test_kfold_indices[0])
+
+            # print(X[X_train_kfold_indices[1], :]) # Get data according to indices for that split.
+            # print(y[X_train_kfold_indices[1]])
+
+            # print()
+
+            # print(results)
+
+            # print()
+
         return test_probabilities, calibration_probabilities, y_calibration
-    
-
-
-
 
 
 
@@ -465,7 +525,13 @@ class IEclair(ABC):
         pass
     
     @abstractmethod
-    def Classify(self):
+    def Classify(self,
+        X_train: np.ndarray[tuple[int, int], np.dtype[np.float64]],
+        X_calibration: np.ndarray[tuple[int, int], np.dtype[np.float64]],
+        y_calibration: np.ndarray[tuple[int,], np.dtype[np.int64]],
+        Classifier: ICustomClassifier,
+        **kwargs
+    ):
         """Classify samples with the relabelling process.
         """
         pass
@@ -479,6 +545,9 @@ class Eclair:
     ):
         self._minimum_occurrence_nb_per_class = minimum_occurrence_nb_per_class
         self._y = y # Real labels.
+        self._unique_y = []
+        if not self._y is None:
+            self._unique_y = np.unique(self._y)
 
     @property
     def minimum_occurrence_nb_per_class(self): return self._minimum_occurrence_nb_per_class
@@ -498,7 +567,7 @@ class Eclair:
         """
         if self._y is None:
             return 0
-        return len(self._y)
+        return len(self._unique_y)
 
 
     # ---------------------------------------------------------------------------- #
@@ -632,6 +701,22 @@ class CrossEntropy(Eclair, IEclair):
             # Recompute the entropy based on the updated y.
             sample_entropy = entropy(y, base = self._entropy_base)
         return kept_classes
+    
+    def _ClassificationOnRelabeledData(
+        self,
+        X_train,
+        X_calibration,
+        threshold1: float,
+        threshold2: float,
+        Classifier: ICustomClassifier
+    ):
+        """Predict probabilities on relabelling data.
+        """
+        # Get new y labels.
+        new_y = self.Relabelling(threshold1 = threshold1, threshold2 = threshold2)
+        # Get masses on the new y labels.
+        masses = Classifier.PredictProba(X_train, X_calibration, new_y)
+        return masses, new_y
         
 
     # ---------------------------------------------------------------------------- #
@@ -723,32 +808,33 @@ class CrossEntropy(Eclair, IEclair):
         X_calibration,
         y_calibration,
         Classifier: ICustomClassifier,
-        threshold_entropy_space: np.ndarray[tuple[int,], np.dtype[np.float64]], # Search optimal threshold values.
-        beta: np.ndarray[tuple[int,], np.dtype[np.float64]]
+        **kwargs
     ):
         """Classify new samples and optimize hyper-parameters.
         """
-        def _ClassificationOnRelabeledData(
-                threshold1,
-                threshold2
-            ):
-            """Predict probabilities on relabelling data.
-            """
-            # Get new y labels.
-            new_y = self.Relabelling(threshold1, threshold2)
-            # Get masses on the new y labels.
-            masses = Classifier.PredictProba(X_train, X_calibration, new_y)
-            return masses, new_y
+
+        if not 'threshold_entropy_space' in kwargs or not 'beta' in kwargs:
+            return
+
+        threshold_entropy_space: np.ndarray[tuple[int,], np.dtype[np.float64]] = kwargs['threshold_entropy_space'] # Search optimal threshold values.
+        beta: np.ndarray[tuple[int,], np.dtype[np.float64]] = kwargs['beta']
 
         # Parallelization.
         with Pool() as pool:
-            results = pool.starmap(_ClassificationOnRelabeledData, [
-                (i, i) for i in threshold_entropy_space
+            results = pool.starmap(
+                self._ClassificationOnRelabeledData, [
+                (
+                    X_train,
+                    X_calibration,
+                    i,
+                    i,
+                    Classifier
+                ) for i in threshold_entropy_space
             ])
         
-        perf_u65_pc = []
+        perf_u65_pc: list[np._Float64_co] = []
         perf_u65_eclair: list[tuple] = []
-        perf_u65_sd = []
+        perf_u65_sd: list[float] = []
 
         for masses, new_y in results:
             # Evaluation.
@@ -757,6 +843,10 @@ class CrossEntropy(Eclair, IEclair):
                 np.unique(new_y),
                 self.nb_classes
             )
+
+            # TODO: prb pred_pc_tst est un tableau de tableau et ça ne va pas fonctionner pour accuracy_score.
+            
+            print(pred_pc_tst)
             perf_u65_pc.append(accuracy_score(
                 y_calibration,
                 pred_pc_tst,
@@ -773,10 +863,11 @@ class CrossEntropy(Eclair, IEclair):
                     beta[i],
                     self.nb_classes
                 )
+
+                # TODO: delete nb classes here, unused on original file.
                 _, _, u65_eclair, _, _ = SetValuedClassification.SetValuedClassEvaluation(
                     y_calibration,
-                    pred_eclair,
-                    self.nb_classes
+                    pred_eclair
                 )
                 eclair_beta_u65.append(u65_eclair)
 
@@ -790,13 +881,12 @@ class CrossEntropy(Eclair, IEclair):
             )
             _, _, u65_sd, _, _ = SetValuedClassification.SetValuedClassEvaluation(
                 y_calibration,
-                pred_sd_tst,
-                self.nb_classes
+                pred_sd_tst
             )
             perf_u65_sd.append(u65_sd)
         
         
-        threshold_entropy_opt_pc = threshold_entropy_space[np.argmax(perf_u65_pc)]
+        threshold_entropy_opt_pc = threshold_entropy_space[np.argmax(np.array(perf_u65_pc))]
 
         opt_eclair = np.argmax([perf_u65_eclair[k][0] for k in range(len(threshold_entropy_space))] )
         param_opt_eclair = [threshold_entropy_space[opt_eclair], perf_u65_eclair[opt_eclair][1]]
@@ -979,33 +1069,36 @@ if __name__ == '__main__':
 
     # EXEMPLE.
     x = np.array([
-        [1, 2, 3, 6],
-        [4, 5, 6, 15],
-        [7, 8, 9, 24],
-        [10, 11, 12, 33],
-        [10, 20, 30, 60],
-        [40, 50, 60, 150]
+        [0.1, 0.11, 0.12, 0.13],
+        [0.21, 0.22, 0.23, 0.24],
+        [0.7, 0.69, 0.68, 0.67],
+        [0.97, 0.96, 0.95, 0.94],
+        [0.99, 0.99, 0.99, 0.99],
+        [0.01, 0.02, 0.03, 0.04]
     ])
     x_cal = np.array([
         [70, 80, 90, 240],
         [100, 110, 120, 330],
     ])
-    y = np.array([0, 1, 2, 0, 0, 1])
+    y = np.array([1, 1, 2, 2, 0, 0])
     y_cal = np.array([2, 0])
 
+    data = load_iris()
 
-    nbc = CustomNaiveBayesClassifier(2, 3)
+    nbc = CustomNaiveBayesClassifier()
     #
-    nb_splits = 5
-    proba_train, calibration_probabilities, y_calibration = nbc.PredictProbaKFold(x, y, nb_splits, 42)
+    nb_splits = 2
+    proba_train, calibration_probabilities, y_calibration = nbc.PredictProbaKFold(data.data, data.target, np.array([]), np.array([0,1,2,3]), nb_splits, 0.2, 42)
     # Get probabilities of all samples in dataset.
     posterior_proba = np.concatenate([proba_train[j] for j in range(nb_splits)])
+    print(posterior_proba)
     # OR
     # Divide by train/test.
-    posterior_prob = nbc.PredictProba(x, x_cal, y)
-    cross_entrop = CrossEntropy(5, 2, posterior_prob, y)
-    cross_entrop.Classify(x, x_cal, y_cal, nbc, np.linspace(0.2, 3, num=50), np.linspace(0, 3, num=50))
+    # posterior_proba = nbc.PredictProba(x, x_cal, y)
+    cross_entrop = CrossEntropy(5, 2, posterior_proba, data.target)
+    threshold_entropy_opt_pc, threshold_entropy_opt_sd, param_opt_eclair = cross_entrop.Classify(x, x_cal, y_cal, nbc, threshold_entropy_space = np.linspace(0.2, 3, num=50), beta = np.linspace(0, 3, num=50))
+    print(threshold_entropy_opt_pc)
 
-    print(Utils.BinaryToInteger([False, True, True]))
-    print(Utils.IntegerToBinary(10, 4))
+    # print(Utils.BinaryToInteger([False, True, True]))
+    # print(Utils.IntegerToBinary(10, 4))
     
