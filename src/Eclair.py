@@ -157,6 +157,10 @@ class Utils:
                                                                               
 class SetValuedClassification:
 
+    ###
+    # SetValuedClassEvaluation
+    ###
+
     @staticmethod
     def SetValuedClassEvaluation(
         truth: np.ndarray[tuple[int,], np.dtype[np.int64]],
@@ -209,6 +213,12 @@ class SetValuedClassification:
              
         return acc, u50, u65, u80, acc_imp
     
+
+    ###
+    # CLASSE DECISION.
+    # SET VALUED CLASSIFICATION.
+    ###
+
     @staticmethod
     def PignisticCriterion(
         m_test,
@@ -271,6 +281,8 @@ class SetValuedClassification:
                 gain.append(gain_tmp)
             pred.append(Utils.BinaryToClass(Utils.IntegerToBinary(focals[np.argmax(gain)],nb_classes), nb_classes))
         return pred
+
+
 
 
 
@@ -507,6 +519,10 @@ class CustomNaiveBayesClassifier(NaiveBayesClassifier, ICustomClassifier):
 
 
 
+
+
+
+
 # 8888888888         888          d8b         
 # 888                888          Y8P         
 # 888                888                      
@@ -516,28 +532,8 @@ class CustomNaiveBayesClassifier(NaiveBayesClassifier, ICustomClassifier):
 # 888       Y88b.    888 888  888 888 888     
 # 8888888888 "Y8888P 888 "Y888888 888 888     
 
+
 class IEclair(ABC):
-
-    @abstractmethod
-    def Relabelling(self, **kwargs) -> list[int]:
-        """Get imprecise labels.
-        """
-        pass
-    
-    @abstractmethod
-    def Classify(self,
-        X_train: np.ndarray[tuple[int, int], np.dtype[np.float64]],
-        X_calibration: np.ndarray[tuple[int, int], np.dtype[np.float64]],
-        y_calibration: np.ndarray[tuple[int,], np.dtype[np.int64]],
-        Classifier: ICustomClassifier,
-        **kwargs
-    ):
-        """Classify samples with the relabelling process.
-        """
-        pass
-
-
-class Eclair:
 
     def __init__(self,
         minimum_occurrence_nb_per_class: int, # Minimum number of occurrences of a class.
@@ -568,6 +564,25 @@ class Eclair:
         if self._y is None:
             return 0
         return len(self._unique_y)
+    
+    @abstractmethod
+    def Relabelling(self, **kwargs) -> list[int]:
+        """Get imprecise labels.
+        """
+        pass
+    
+    @abstractmethod
+    def Classify(self,
+        X_train: np.ndarray[tuple[int, int], np.dtype[np.float64]],
+        X_calibration: np.ndarray[tuple[int, int], np.dtype[np.float64]],
+        y_calibration: np.ndarray[tuple[int,], np.dtype[np.int64]],
+        Classifier: ICustomClassifier,
+        **kwargs
+    ):
+        """Classify samples with the relabelling process.
+        """
+        pass
+
 
 
     # ---------------------------------------------------------------------------- #
@@ -612,15 +627,19 @@ class Eclair:
 #                                                                                         888      Y8b d88P 
 #                                                                                         888       "Y88P"  
 
-class CrossEntropy(Eclair, IEclair):
+class CrossEntropy(IEclair):
 
     def __init__(self,
         minimum_occurrence_nb_per_class: int,
         entropy_base: int, # The logarithmic base to use to entropy computation.
+
+        # TODO: probabilities a remonter dans la classe Eclair ?
+        # A l'air différent pour ConformalPrediction.
+
         probabilities: np.ndarray[tuple[int, int], np.dtype[np.float64]] | None = None, # Posterior probabilities, shape (n_samples, n_classes).
         y: np.ndarray[tuple[int,], np.dtype[np.int64]] | None = None # Shape (n_samples,).
     ):
-        Eclair.__init__(self, 
+        IEclair.__init__(self, 
             minimum_occurrence_nb_per_class=minimum_occurrence_nb_per_class,
             y = y
         )
@@ -832,7 +851,7 @@ class CrossEntropy(Eclair, IEclair):
                 ) for i in threshold_entropy_space
             ])
         
-        perf_u65_pc: list[np._Float64_co] = []
+        perf_u65_pc: list[float] = []
         perf_u65_eclair: list[tuple] = []
         perf_u65_sd: list[float] = []
 
@@ -846,7 +865,9 @@ class CrossEntropy(Eclair, IEclair):
 
             # TODO: prb pred_pc_tst est un tableau de tableau et ça ne va pas fonctionner pour accuracy_score.
             
+            print(y_calibration)
             print(pred_pc_tst)
+
             perf_u65_pc.append(accuracy_score(
                 y_calibration,
                 pred_pc_tst,
@@ -915,7 +936,7 @@ class CrossEntropy(Eclair, IEclair):
 # Y88b  d88P Y88..88P 888  888 888   Y88..88P 888     888  888  888 888  888 888 888        888    Y8b.     Y88b 888 
 #  "Y8888P"   "Y88P"  888  888 888    "Y88P"  888     888  888  888 "Y888888 888 888        888     "Y8888   "Y88888 
                                                                                                                          
-class ConformalPrediction(Eclair, IEclair):
+class ConformalPrediction(IEclair):
 
     def __init__(self,
         minimum_occurrence_nb_per_class: int,
@@ -924,7 +945,7 @@ class ConformalPrediction(Eclair, IEclair):
         test_probabilities: list[np.ndarray[tuple[int, int], np.dtype[np.float64]]], # Probabilities on test data for each fold, shape(n_samples, n_classes).
         y: Union[np.ndarray[tuple[int,], np.dtype[np.int64]], None] = None # Shape (n_samples,).
     ):
-        Eclair.__init__(self, 
+        IEclair.__init__(self, 
             minimum_occurrence_nb_per_class=minimum_occurrence_nb_per_class,
             y = y
         )

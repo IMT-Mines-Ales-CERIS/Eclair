@@ -51,6 +51,8 @@ class NaiveBayesClassifier:
         nb_samples = len(y_train)
         distinct_classes, class_count = np.unique(y_train, return_counts=True)
         nb_classes = len(distinct_classes)
+        mu = []
+        sigma2 = []
         # Numerical features.
         if probability_type == 'gaussian':
             mu = [
