@@ -12,7 +12,7 @@ from sklearn.model_selection import KFold
 from sklearn.model_selection import train_test_split
 from typing import Union
 
-from NaiveBayes import NaiveBayesClassifier
+from src_old.Archives.NaiveBayes import NaiveBayesClassifier
 
 
 # 888     888 888    d8b 888          
