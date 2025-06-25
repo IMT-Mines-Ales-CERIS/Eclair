@@ -24,7 +24,7 @@ class IEclair(ABC):
             * ``custom_classifier`` - Classifier to get masses on new classes on the test set.
             * ``minimum_occurrence_nb_per_class``: Minimum number of occurrences to keep a new class.
 
-        Example of a posterior probabilities on training dataset:
+        Example of posterior probabilities on the training dataset:
 
         <table>
             <tr><td></td><td>P(a|x)</td><td>P(b|x)</td><td>P(c|x)</td></tr>
@@ -85,7 +85,7 @@ class IEclair(ABC):
         """Get imprecise labels on training dataset.
 
         ### Returns :
-            * ``list`` - New classes on each sample of the training dataset, (2^nb_classes - 1) possible classes.
+            * New classes for each sample of the training dataset, (2^nb_classes - 1) possible classes.
         """
         pass
     
@@ -101,10 +101,9 @@ class IEclair(ABC):
         """Get masses on new classes for each X_test sample.
 
         ### Returns :
-            * ``list`` - Masses for each new classes on test dataset.
-            * ``list`` - New classes on each sample of the training dataset, (2^nb_classes - 1) possible classes.
-        """
-        
+            * Masses for each new classes on the test dataset.
+            * New classes for each sample of the training dataset, (2^nb_classes - 1) possible classes.
+        """        
         # Get new y labels.
         new_y = self.Relabelling()
         # Get masses on the new y labels.

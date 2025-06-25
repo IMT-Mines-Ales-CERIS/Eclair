@@ -32,20 +32,25 @@ class SetValuedClassification:
         """
         pred = []
         for i in range (len(m_test)):
+            
+            # TODO: m_test correspond aux masses (~probabilités) sur X_train et new_y.
+            # pourquoi ProbabilityToBelief redonnent des masses ?
+            # être certain du vocabulaire que l'on emploi.
+
             N = [False] * nb_classes # TODO: que veux dire N.
             focals, masses = Utils.ProbabilityToBelief(m_test[i], selflevels)
             bel, pl, _ = Utils.GetBeliefPlausibility(focals, masses, nb_classes)
-            for a in range (nb_classes):
-                comp=0
-                for b in range (nb_classes):
-                    if(a!=b):
-                        if(  (bel[b] >= pl[a]) ):
+            for a in range(nb_classes):
+                comp = 0
+                for b in range(nb_classes):
+                    if a != b:
+                        if bel[b] >= pl[a]:
                             break
                         else:
-                            comp+=1
-                if( (comp==(nb_classes-1)) ):
-                    N[a]=True
-            pred.append(Utils.BinaryToClass(N,nb_classes))
+                            comp += 1
+                if comp == (nb_classes - 1):
+                    N[a] = True
+            pred.append(Utils.BinaryToClass(N, nb_classes))
         return pred
     
     @staticmethod

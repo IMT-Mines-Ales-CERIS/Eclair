@@ -6,10 +6,6 @@ from ICustomClassifier import ICustomClassifier
 
 class CustomNaiveBayesClassifier(ICustomClassifier):
 
-    def __init__(self):
-        pass
-
-
     def PredictProba(self,
         X_train: np.ndarray[tuple[int, int], np.dtype[np.float64]],
         X_test: np.ndarray[tuple[int, int], np.dtype[np.float64]],
@@ -24,8 +20,7 @@ class CustomNaiveBayesClassifier(ICustomClassifier):
             * ``y_train`` - Shape, (n_samples,).
 
         ### Returns :
-            * ``list`` - Probabilities for each classes.
+            * Probabilities for each class by sample.
         """
-
         gnb = GaussianNB()
         return np.round(gnb.fit(X_train, y_train).predict_proba(X_test), 3).astype(np.float64)

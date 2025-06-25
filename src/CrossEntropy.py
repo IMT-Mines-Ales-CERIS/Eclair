@@ -1,6 +1,5 @@
 import numpy as np
 
-from abc import ABC, abstractmethod
 from scipy.stats import entropy
 
 from ICustomClassifier import ICustomClassifier
@@ -27,7 +26,7 @@ class CrossEntropy(IEclair):
             y_train,
             posterior_probabilities,
             custom_classifier,
-            minimum_occurrence_nb_per_class # Minimum number of occurrences of a class.
+            minimum_occurrence_nb_per_class
         )
         self._threshold1 = threshold1
         self._threshold2 = threshold2
@@ -57,6 +56,9 @@ class CrossEntropy(IEclair):
         threshold: float # Threshold to apply class grouping.
     ) -> list[int]:
         """Get a subset of classes according to their probabilities (higher probabilities) in order to reduce entropy.
+
+        ### Returns :
+            * Set of the labels assigned to the sample.
         """
         y: list[float] = [] # Keep the sum of probabilities equal.
         z: list[float] = [] # Use to get the higher remaining probability.
@@ -87,16 +89,16 @@ class CrossEntropy(IEclair):
             probability_sum += sample_probabilities[max_value_index]
             # Keep the new higher class according to their probability.
             kept_classes.append(max_value_index)
-            # Update z.
-            z[max_value_index] = 0.0
             # Update y.
-            del y[max_value_index]
+            y.remove(sample_probabilities[max_value_index])
             # Delete the old sum.
             y = y[:-1]
             # Add the new sum.
             y.append(probability_sum)
             # Recompute the entropy based on the updated y.
             sample_entropy = entropy(y, base = self._entropy_base)
+            # Update z.
+            z[max_value_index] = 0.0
         return kept_classes
     
 
@@ -106,6 +108,9 @@ class CrossEntropy(IEclair):
 
     def Relabelling(self, **kwargs) -> np.ndarray[tuple[int,], np.dtype[np.int64]]:
         """Relabelling based on entropy computation.
+
+        ### Returns :
+            * New classes on each sample of the training dataset, (2^nb_classes - 1) possible classes.
         """        
         
         new_y: list[int] = [] # New labels: subset in natural numbers.
@@ -134,7 +139,7 @@ class CrossEntropy(IEclair):
                     y_b2d = Utils.BinaryToInteger([k in classes_subset for k in range(self.nb_classes)])
                 # He is wrong and he has no doubts.
                 else:
-                    y_b2d = 2**self.nb_classes - 1 # TODO: pourquoi le -1 ? car de mon côté j'ai normalisé les classes de 0 à n-1
+                    y_b2d = 2**self.nb_classes - 1 # TODO: pourquoi le -1 ? car de mon côté j'ai normalisé les classes de 0 à n-1 (car ensemble vide ?) 2^nb_classes - 1 .
             new_y.append(y_b2d)
             
         # Get all new labels and count them.
