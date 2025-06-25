@@ -53,6 +53,8 @@ class ICustomClassification(ABC):
 
 You must implement this interface in your classifier class. The framework will call `PredictProba` to obtain probability distributions used by the relabelling method.
 
+![architecture](images/eclair.png)
+
 ---
 
 ## 🧠 Default Method: Cross-Entropy Based Relabelling
