@@ -63,13 +63,9 @@ def PredictProbaKFold(
 
     return np.concatenate(results)
 
-        
 
-if __name__ == '__main__':
-    start = time.time()
-
+def BasicExample(X, y):
     gnb = CustomNaiveBayesClassifier()
-    X, y = load_iris(return_X_y = True)
 
     # Shuffle the data because the labels are initially ordered.
     X_train, X_test, y_train, y_test = train_test_split(
@@ -103,5 +99,147 @@ if __name__ == '__main__':
     #     print(format.format(str(a), str(b), str(c)))
 
     print(f'\nAccuracy: {accuracy_score(y_test, pred_sd)}')
+    return accuracy_score(y_test, pred_sd)
+
+
+def OptimizeBasicExample(X, y):
+    gnb = CustomNaiveBayesClassifier()
+
+    # Shuffle the data because the labels are initially ordered.
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size = 0.2, shuffle = True, random_state = 42
+    )
+    # Get posterior probabilities on the training set for each class.
+    # If nb_folds = nb_samples, it's like a leave-one-out.
+    nb_folds = 20
+    posterior_probabilities = PredictProbaKFold(np.array(X_train), np.array(y_train), gnb, nb_folds)
+
+    best_params = []
+    best_accuracy = 0
+    for threshold in np.linspace(0, 3, num=20):
+        cross_entropy = CrossEntropy(X_train, X_test, y_train, posterior_probabilities, gnb, 2, threshold, threshold, 2)
+        masses, new_y = cross_entropy.Predict()
+
+        # pred_sd_set = SetValuedClassification.StrongDominance(
+        #     masses,
+        #     np.unique(new_y),
+        #     len(np.unique(y))
+        # )
+
+        for beta in np.linspace(0.2, 3, num=20):
+            pred_sd_set = SetValuedClassification.GFBeta(
+                masses,
+                np.unique(new_y),
+                beta,
+                len(np.unique(y))
+            )
+
+            pred_sd = []
+            for i, value in enumerate(pred_sd_set):
+                if len(value) > 1:
+                    pred_sd.append(len(np.unique(y)) + i)
+                else:
+                    pred_sd.append(value[0])
+
+            accuracy = accuracy_score(y_test, pred_sd)
+            if accuracy > best_accuracy:
+                best_accuracy = accuracy
+                best_params = [(threshold, beta)]
+            elif accuracy == best_accuracy:
+                best_params.append((threshold, beta))
+
+            # print(f'Threshold: {threshold}, Beta: {beta}, Accuracy: {accuracy_score(y_test, pred_sd)}')
+    
+    print(best_accuracy)
+    print(best_params)
+
+
+
+
+def LeaveOneOut(X, y):
+    gnb = CustomNaiveBayesClassifier()
+    accuracy = []
+    nb_folds = len(X) # Leave one out.
+    X_train_kfold_indices, X_test_kfold_indices = Utils.Kfold(np.array(X), nb_folds)
+    for k in range(nb_folds):
+        X_train = X[X_train_kfold_indices[k], :]
+        X_test = X[X_test_kfold_indices[k], :]
+        y_train = y[X_train_kfold_indices[k]]
+        y_test = y[X_test_kfold_indices[k]]
+
+        posterior_probabilities = PredictProbaKFold(np.array(X_train), np.array(y_train), gnb, len(X_train))
+        cross_entropy = CrossEntropy(X_train, X_test, y_train, posterior_probabilities, gnb, 2, 0.936, 0.936, 2)
+        masses, new_y = cross_entropy.Predict()
+
+        pred_sd_set = SetValuedClassification.GFBeta(
+            masses,
+            np.unique(new_y),
+            0.08,
+            len(np.unique(y))
+        )
+
+        pred_sd = []
+        for i, value in enumerate(pred_sd_set):
+            if len(value) > 1:
+                pred_sd.append(len(np.unique(y)) + i) # Wrong labels.
+            else:
+                pred_sd.append(value[0])
+
+        print(f'Accuracy: {accuracy_score(y_test, pred_sd)}')
+        accuracy.append(accuracy_score(y_test, pred_sd))
+    print(f'\nMean accuracy: {np.mean(accuracy)}')
+    return np.mean(accuracy)
+
+
+def OptimizeLeaveOneOut(X, y):
+    """Prediction on the entire dataset with optimization of cross entropy threshold and CF beta parameters.
+    """
+    gnb = CustomNaiveBayesClassifier()
+    all_accuracies = []
+    nb_folds = len(X) # Leave one out.
+    X_train_kfold_indices, X_test_kfold_indices = Utils.Kfold(np.array(X), nb_folds)
+    for k in range(nb_folds):
+        X_train = X[X_train_kfold_indices[k], :]
+        X_test = X[X_test_kfold_indices[k], :]
+        y_train = y[X_train_kfold_indices[k]]
+        y_test = y[X_test_kfold_indices[k]]
+        # Leave one out on training dataset to get posterior probabilities on the set.
+        posterior_probabilities = PredictProbaKFold(np.array(X_train), np.array(y_train), gnb, len(X_train))
+        
+        best_accuracy = 0
+        for threshold in np.linspace(0, 3, num=20):
+            cross_entropy = CrossEntropy(X_train, X_test, y_train, posterior_probabilities, gnb, 2, threshold, threshold, 2)
+            masses, new_y = cross_entropy.Predict()
+
+            for beta in np.linspace(0, 3, num=20):
+                pred_sd_set = SetValuedClassification.GFBeta(
+                    masses,
+                    np.unique(new_y),
+                    beta,
+                    len(np.unique(y))
+                )
+
+                pred_sd = []
+                for i, value in enumerate(pred_sd_set):
+                    if len(value) > 1:
+                        pred_sd.append(len(np.unique(y)) + i)
+                    else:
+                        pred_sd.append(value[0])
+
+                accuracy = accuracy_score(y_test, pred_sd) # 0 or 1, only one test sample (leave one out).
+                if accuracy > best_accuracy:
+                    best_accuracy = accuracy # We can break if best_accuracy == 1.
+
+        all_accuracies.append(best_accuracy)
+
+    print(f'\nMean accuracy: {np.mean(all_accuracies)}')
+    return np.mean(all_accuracies) # 0.96 in 78.88s (without break).
+
+if __name__ == '__main__':
+    start = time.time()
+
+    X, y = load_iris(return_X_y = True)
+
+    OptimizeLeaveOneOut(X, y)
 
     print(f'\nDuration: {np.round(time.time() - start, 2)}s')

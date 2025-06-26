@@ -54,7 +54,7 @@ class SetValuedClassification:
         return pred
     
     @staticmethod
-    def EclairGFBeta(
+    def GFBeta(
         m_test,
         selflevels,
         beta,
