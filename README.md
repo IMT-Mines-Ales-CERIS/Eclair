@@ -1,67 +1,60 @@
 # Cautious Classification Framework
 
-This project provides a modular and extensible framework based on the paper [Cautious Classification for Credible Learning with Uncertainty](https://imt-mines-ales.hal.science/hal-03472031v1/file/cautious-classification.pdf).
+This project provides a modular and extensible code based on the paper [Cautious classification based on belief functions theory and imprecise relabelling](https://imt-mines-ales.hal.science/hal-03472031v1/file/cautious-classification.pdf). It allows users to plug in their **own relabelling logic**, offers the flexibility to use different classifiers, and provides the opportunity to experiment with a relabeling strategy based on cross-entropy.
 
-It allows researchers and developers to experiment with cautious relabelling methods for probabilistic classifiers, and to easily integrate custom strategies.
+## Requirements
 
-Paper authors:
-* Abdelhak Imoussaten
-* Lucie Jacquin
+* Python ≥ 3.10
 
-Code rewriting author:
-* Pierre-Antoine Jean
+```
+pip install -r requirements.txt
+```
 
-## 🚀 Project Overview
+## Code Architecture
 
-The goal of this framework is to:
-- Enable **cautious relabelling** of classification predictions, based on uncertainty measures,
-- Allow users to plug in their **own relabelling logic** and **custom classifiers**,
-- Provide a clean interface for experimentation and benchmarking.
-
-## 🧩 Code Architecture
-
-The project is structured around two interfaces that users must implement:
+The project is structured around two abstract methods that users must implement:
 
 ### `IEclair.py`
 
-This interface defines the contract for any cautious relabelling method.  
-It contains one abstract method:
+This class defines the contract for any relabelling method.
 
 ```python
 class IEclair(ABC):
     @abstractmethod
-    def Relabelling(self, **kwargs) -> list[int]:
+    def Relabelling(self, **kwargs) -> np.ndarray[tuple[int,], np.dtype[np.int64]]:
         """Compute imprecise labels based on a cautious strategy."""
         pass
 ````
 
-You must implement this method in your own relabelling class.
+You must implement this method in your own relabelling class (ex. *CrossEntropy.py* class).
 
 ---
 
 ### `ICustomClassification.py`
 
-This interface defines a model capable of producing **posterior probabilities** on demand.
+This class defines the signature of a method capable of producing **posterior probabilities** on demand.
 
 ```python
 class ICustomClassification(ABC):
     @abstractmethod
-    def PredictProba(self, X_train, X_test, y_train) -> np.ndarray:
-        """Return class probability predictions for X_test."""
+    def PredictProba(self,
+        X_train: np.ndarray[tuple[int, int], np.dtype[np.float64]],
+        X_test: np.ndarray[tuple[int, int], np.dtype[np.float64]],
+        y_train: np.ndarray[tuple[int,], np.dtype[np.int64]],
+        **kwargs
+    ) -> np.ndarray[tuple[int, int], np.dtype[np.float64]]:
         pass
 ```
 
-You must implement this interface in your classifier class. The framework will call `PredictProba` to obtain probability distributions used by the relabelling method.
+You must implement this abstract method in your classifier class (ex. *CustomGaussianNB.py* class).
 
-![architecture](images/eclair.png)
+<div align=center>
+    <img src="images/eclair.png" alt="Architecture">
+</div>
 
----
-
-## 🧠 Default Method: Cross-Entropy Based Relabelling
+## Relabelling based on Cross-Entropy
 
 The current implementation includes a default relabelling strategy based on **cross-entropy**, in line with the original paper.
-
-Users can replace or extend this method by implementing their own version of `IEclair`.
 
 ```python
 gnb = CustomNaiveBayesClassifier()
@@ -84,21 +77,20 @@ masses, new_y = cross_entropy.Predict()
 * Fitting a model on the training set with new labels,
 * Predicting posterior probabilities on the test set, based on the relabelled labels.
 
-## 🔧 How to Use
+## Acknowledgments
 
-1. **Implement your own classifier** by subclassing `ICustomClassification`.
-2. **Implement your relabelling method** by subclassing `IEclair`.
-3. Use the framework to run cautious classification on your dataset.
+I would like to thank [Pierre-Antoine Jean](https://github.com/PAJEAN) for taking over and restructuring the initial code to make it available to the community.
 
-You can combine any classifier and relabelling method that follow the two interfaces above.
+## Citation
 
-## 📌 Requirements
-
-* Python ≥ 3.10
-
-## 🤝 Acknowledgments
-
-Based on the publication:
-
-> *Cautious Classification for Credible Learning with Uncertainty*,
-> Hal-BLR HAL Id: [hal-03472031](https://imt-mines-ales.hal.science/hal-03472031v1)
+```latex
+@article{imoussaten2022cautious,
+  title={Cautious classification based on belief functions theory and imprecise relabelling},
+  author={Imoussaten, Abdelhak and Jacquin, Lucie},
+  journal={International Journal of Approximate Reasoning},
+  volume={142},
+  pages={130--146},
+  year={2022},
+  publisher={Elsevier}
+}
+```
