@@ -84,8 +84,6 @@ masses, new_y = cross_entropy.Predict()
 * Fitting a model on the training set with new labels,
 * Predicting posterior probabilities on the test set, based on the relabelled labels.
 
----
-
 ## 🔧 How to Use
 
 1. **Implement your own classifier** by subclassing `ICustomClassification`.

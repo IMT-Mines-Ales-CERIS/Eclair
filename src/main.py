@@ -1,8 +1,6 @@
 import numpy as np
-import os
 import time
 
-from multiprocessing import Pool
 from sklearn.datasets import load_iris
 from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
@@ -12,6 +10,20 @@ from CustomGaussianNB import CustomNaiveBayesClassifier
 from ICustomClassifier import ICustomClassifier
 from SetValuedClassification import SetValuedClassification
 from Utils import Utils
+
+
+def ProcessLabelSets(
+        label_sets: list[list[int]],
+        initial_nb_classes: int
+    ) -> list[int]:
+    """Convert [[0,1], [0], [1]] to [2, 0, 1], if there is 2 classes (0 and 1).
+    """
+    labels = []
+    for i, value in enumerate(label_sets):
+        # Assign a wrong labels when the set contains more than 1 class.
+        labels.append(initial_nb_classes + i if len(value) > 1 else value[0])
+    return labels
+
 
 def PredictProbaKFold(
         X: np.ndarray[tuple[int, int], np.dtype[np.float64]],
@@ -29,29 +41,10 @@ def PredictProbaKFold(
 
     ### Returns :
         * Posterior probabilities on training dataset.
-    """
-    
+    """    
     # For a dataset with 6 entries and a split number of 2 here is the return : ([(TRAIN)array([3, 4, 5]), (TEST)array([0, 1, 2])], [(TRAIN)array([0, 1, 2]), (TEST)array([3, 4, 5])]).
     # It is important to make the kfold without shuffle to keep dataset order in test data (0, 1, 2, 3, 4, 5).
     X_train_kfold_indices, X_test_kfold_indices = Utils.Kfold(X, nb_folds)
-    
-    # Parallelization.
-    # If processes argument is None then the number returned by os.process_cpu_count() is used.
-    
-    # print(f'Processes used {os.process_cpu_count()}\n')
-    # with Pool() as pool:
-    #     results = pool.starmap(
-    #         custom_classifier.PredictProba, [
-    #             (
-    #                 X[X_train_kfold_indices[k], :],
-    #                 X[X_test_kfold_indices[k], :],
-    #                 y[X_train_kfold_indices[k]]
-    #             )
-    #             for k in range(nb_folds)
-    #         ]
-    #     )
-
-    # OR
     
     results = [
         custom_classifier.PredictProba(
@@ -75,34 +68,24 @@ def BasicExample(X, y):
     # If nb_folds = nb_samples, it's like a leave-one-out.
     nb_folds = 20
     posterior_probabilities = PredictProbaKFold(np.array(X_train), np.array(y_train), gnb, nb_folds)
-    cross_entropy = CrossEntropy(X_train, X_test, y_train, posterior_probabilities, gnb, 2, 0.6, 0.6, 2)
+    cross_entropy = CrossEntropy(X_train, X_test, y_train, posterior_probabilities, gnb, 2, 1.0, 1.0, 2)
     masses, new_y = cross_entropy.Predict()
 
-    print(f'Distinct new labels: {np.unique(new_y)}\n')
+    print(f'Distinct new classes: {np.unique(new_y)}')
 
-    pred_sd_set = SetValuedClassification.StrongDominance(
+    decision = SetValuedClassification(
         masses,
         np.unique(new_y),
         len(np.unique(y))
     )
 
-    pred_sd = []
-    for i, value in enumerate(pred_sd_set):
-        if len(value) > 1:
-            pred_sd.append(len(np.unique(y)) + i)
-        else:
-            pred_sd.append(value[0])
+    pred_set = decision.StrongDominance()
+    pred = ProcessLabelSets(pred_set, len(np.unique(y)))
 
-    # format = "{:<10}{:^8}{:>5}"
-    # print(format.format('pred_set', 'pred', 'y_test'))
-    # for a, b, c in zip(pred_sd_set, pred_sd, y_test):
-    #     print(format.format(str(a), str(b), str(c)))
-
-    print(f'\nAccuracy: {accuracy_score(y_test, pred_sd)}')
-    return accuracy_score(y_test, pred_sd)
+    return accuracy_score(y_test, pred)
 
 
-def OptimizeBasicExample(X, y):
+def BasicExampleOptimization(X, y):
     gnb = CustomNaiveBayesClassifier()
 
     # Shuffle the data because the labels are initially ordered.
@@ -120,40 +103,25 @@ def OptimizeBasicExample(X, y):
         cross_entropy = CrossEntropy(X_train, X_test, y_train, posterior_probabilities, gnb, 2, threshold, threshold, 2)
         masses, new_y = cross_entropy.Predict()
 
-        # pred_sd_set = SetValuedClassification.StrongDominance(
-        #     masses,
-        #     np.unique(new_y),
-        #     len(np.unique(y))
-        # )
+        decision = SetValuedClassification(
+            masses,
+            np.unique(new_y),
+            len(np.unique(y))
+        )
 
         for beta in np.linspace(0.2, 3, num=20):
-            pred_sd_set = SetValuedClassification.GFBeta(
-                masses,
-                np.unique(new_y),
-                beta,
-                len(np.unique(y))
-            )
+            pred_set = decision.GFBeta(beta)
+            pred = ProcessLabelSets(pred_set, len(np.unique(y)))
 
-            pred_sd = []
-            for i, value in enumerate(pred_sd_set):
-                if len(value) > 1:
-                    pred_sd.append(len(np.unique(y)) + i)
-                else:
-                    pred_sd.append(value[0])
-
-            accuracy = accuracy_score(y_test, pred_sd)
+            accuracy = accuracy_score(y_test, pred)
             if accuracy > best_accuracy:
                 best_accuracy = accuracy
                 best_params = [(threshold, beta)]
             elif accuracy == best_accuracy:
                 best_params.append((threshold, beta))
-
-            # print(f'Threshold: {threshold}, Beta: {beta}, Accuracy: {accuracy_score(y_test, pred_sd)}')
     
-    print(best_accuracy)
     print(best_params)
-
-
+    return best_accuracy
 
 
 def LeaveOneOut(X, y):
@@ -171,23 +139,16 @@ def LeaveOneOut(X, y):
         cross_entropy = CrossEntropy(X_train, X_test, y_train, posterior_probabilities, gnb, 2, 0.936, 0.936, 2)
         masses, new_y = cross_entropy.Predict()
 
-        pred_sd_set = SetValuedClassification.GFBeta(
+        decision = SetValuedClassification(
             masses,
             np.unique(new_y),
-            0.08,
             len(np.unique(y))
         )
 
-        pred_sd = []
-        for i, value in enumerate(pred_sd_set):
-            if len(value) > 1:
-                pred_sd.append(len(np.unique(y)) + i) # Wrong labels.
-            else:
-                pred_sd.append(value[0])
+        pred_set = decision.GFBeta(0.08)
+        pred = ProcessLabelSets(pred_set, len(np.unique(y)))
 
-        print(f'Accuracy: {accuracy_score(y_test, pred_sd)}')
-        accuracy.append(accuracy_score(y_test, pred_sd))
-    print(f'\nMean accuracy: {np.mean(accuracy)}')
+        accuracy.append(accuracy_score(y_test, pred)) # 0 or 1, only one test sample (leave one out).
     return np.mean(accuracy)
 
 
@@ -211,35 +172,34 @@ def OptimizeLeaveOneOut(X, y):
             cross_entropy = CrossEntropy(X_train, X_test, y_train, posterior_probabilities, gnb, 2, threshold, threshold, 2)
             masses, new_y = cross_entropy.Predict()
 
+            decision = SetValuedClassification(
+                masses,
+                np.unique(new_y),
+                len(np.unique(y))
+            )
+
             for beta in np.linspace(0, 3, num=20):
-                pred_sd_set = SetValuedClassification.GFBeta(
-                    masses,
-                    np.unique(new_y),
-                    beta,
-                    len(np.unique(y))
-                )
+                pred_set = decision.GFBeta(beta)
+                pred = ProcessLabelSets(pred_set, len(np.unique(y)))
 
-                pred_sd = []
-                for i, value in enumerate(pred_sd_set):
-                    if len(value) > 1:
-                        pred_sd.append(len(np.unique(y)) + i)
-                    else:
-                        pred_sd.append(value[0])
-
-                accuracy = accuracy_score(y_test, pred_sd) # 0 or 1, only one test sample (leave one out).
+                accuracy = accuracy_score(y_test, pred) # 0 or 1, only one test sample (leave one out).
                 if accuracy > best_accuracy:
-                    best_accuracy = accuracy # We can break if best_accuracy == 1.
+                    best_accuracy = accuracy
+                    if best_accuracy == 1.0: # We can break if best_accuracy == 1.
+                        break
 
         all_accuracies.append(best_accuracy)
 
-    print(f'\nMean accuracy: {np.mean(all_accuracies)}')
-    return np.mean(all_accuracies) # 0.96 in 78.88s (without break).
+    return np.mean(all_accuracies) # 0.96 in 78.88s (pc labo).
 
 if __name__ == '__main__':
     start = time.time()
 
     X, y = load_iris(return_X_y = True)
 
-    OptimizeLeaveOneOut(X, y)
+    #accuracy = BasicExample(X, y)
+    accuracy = OptimizeLeaveOneOut(X, y)
+
+    print(f'\nAccuracy: {accuracy}')
 
     print(f'\nDuration: {np.round(time.time() - start, 2)}s')
