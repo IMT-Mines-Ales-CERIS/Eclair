@@ -8,6 +8,7 @@ from sklearn.model_selection import train_test_split
 from CrossEntropy import CrossEntropy
 from CustomGaussianNB import CustomNaiveBayesClassifier
 from ICustomClassifier import ICustomClassifier
+from SetValuedClassEvaluation import SetValuedClassEvaluation
 from SetValuedClassification import SetValuedClassification
 from Utils import Utils
 
@@ -80,9 +81,8 @@ def BasicExample(X, y):
     )
 
     pred_set = decision.StrongDominance()
-    pred = ProcessLabelSets(pred_set, len(np.unique(y)))
 
-    return accuracy_score(y_test, pred)
+    return SetValuedClassEvaluation.SetValuedClassEvaluation(y_test, pred_set)
 
 
 def BasicExampleOptimization(X, y):
@@ -197,9 +197,9 @@ if __name__ == '__main__':
 
     X, y = load_iris(return_X_y = True)
 
-    #accuracy = BasicExample(X, y)
-    accuracy = OptimizeLeaveOneOut(X, y)
+    accuracy = BasicExample(X, y)
+    # accuracy = OptimizeLeaveOneOut(X, y)
 
-    print(f'\nAccuracy: {accuracy}')
+    print(f'\nEvaluation: {accuracy}')
 
     print(f'\nDuration: {np.round(time.time() - start, 2)}s')
