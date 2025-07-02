@@ -72,6 +72,8 @@ def BasicExample(X, y):
     cross_entropy = CrossEntropy(X_train, X_test, y_train, posterior_probabilities, gnb, 2, 1.0, 1.0, 2)
     masses, new_y = cross_entropy.Predict()
 
+    print(masses)
+
     print(f'Distinct new classes: {np.unique(new_y)}')
 
     decision = SetValuedClassification(
@@ -185,7 +187,7 @@ def OptimizeLeaveOneOut(X, y):
                 accuracy = accuracy_score(y_test, pred) # 0 or 1, only one test sample (leave one out).
                 if accuracy > best_accuracy:
                     best_accuracy = accuracy
-                    if best_accuracy == 1.0: # We can break if best_accuracy == 1.
+                    if best_accuracy == 1.0: # Break if best_accuracy == 1.
                         break
 
         all_accuracies.append(best_accuracy)

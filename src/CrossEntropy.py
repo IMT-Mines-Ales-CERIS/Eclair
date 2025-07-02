@@ -137,9 +137,9 @@ class CrossEntropy(IEclair):
                     # Add real label, it could appear two times without risk.
                     classes_subset.append(self.y_train[i])
                     y_b2d = Utils.BinaryToInteger([k in classes_subset for k in range(self.nb_classes)])
-                # He is wrong and he has no doubts.
+                # Overconfidence: he is wrong and he has no doubts.
                 else:
-                    y_b2d = 2**self.nb_classes - 1 # TODO: pourquoi le -1 ? car de mon côté j'ai normalisé les classes de 0 à n-1 (car ensemble vide ?) 2^nb_classes - 1 .
+                    y_b2d = 2**self.nb_classes - 1 # Ignorance.
             new_y.append(y_b2d)
             
         # Get all new labels and count them.
@@ -151,7 +151,7 @@ class CrossEntropy(IEclair):
             # If the label is in y_to_modify.
             if new_y[i] in y_to_modify:
                 # Keep the original class.
-                new_y[i] = 2**self.y_train[i] # TODO: la question se pose ici également, c'est normal qu'il n'y est pas de -1 alors pourquoi au dessus ?
+                new_y[i] = 2**self.y_train[i]
             
         # Case when there is not much data.
         distinct_labels, label_count = np.unique(new_y, return_counts=True)

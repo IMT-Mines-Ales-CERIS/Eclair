@@ -39,10 +39,6 @@ class SetValuedClassEvaluation:
             z80 = [0.0] * nb_samples
             z_acc = [0.0] * nb_samples
             for i in range(nb_samples):
-                # TODO: ==[True] ?? Pourquoi passer par un tableau ? Pk pas truth[i] in pred[i] ?
-                # TODO: truth[i] in pred[i]
-                # len(pred) possible de prédir aucun label ?
-                # if len(pred[i]) > 0 and [k in pred[i] for k in [truth[i]]] == [True]: # Est ce que truth peut être un list[list[int]] ou juste list[int] ?
                 if len(pred[i]) > 0 and truth[i] in pred[i]:
                     inPred[i] = 1.0
                     z[i] = 1.0 / len(pred[i])

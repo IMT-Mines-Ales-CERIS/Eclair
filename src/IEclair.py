@@ -107,5 +107,5 @@ class IEclair(ABC):
         # Get new y labels.
         new_y = self.Relabelling()
         # Get masses on the new y labels.
-        masses = self.custom_classifier.PredictProba(self.X_train, self.X_test, new_y)        
+        masses = self.custom_classifier.PredictProba(self.X_train, self.X_test, new_y)
         return masses, new_y
