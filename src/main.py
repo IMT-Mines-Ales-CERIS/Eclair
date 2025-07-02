@@ -72,8 +72,6 @@ def BasicExample(X, y):
     cross_entropy = CrossEntropy(X_train, X_test, y_train, posterior_probabilities, gnb, 2, 1.0, 1.0, 2)
     masses, new_y = cross_entropy.Predict()
 
-    print(masses)
-
     print(f'Distinct new classes: {np.unique(new_y)}')
 
     decision = SetValuedClassification(
@@ -199,8 +197,8 @@ if __name__ == '__main__':
 
     X, y = load_iris(return_X_y = True)
 
-    # accuracy = BasicExample(X, y)
-    accuracy = LeaveOneOut(X, y)
+    accuracy = BasicExample(X, y)
+    # accuracy = LeaveOneOut(X, y)
     # accuracy = OptimizeLeaveOneOut(X, y)
 
     print(f'\nEvaluation: {accuracy}')

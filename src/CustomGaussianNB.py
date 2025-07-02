@@ -23,4 +23,5 @@ class CustomNaiveBayesClassifier(ICustomClassifier):
             * Probabilities for each class by sample.
         """
         gnb = GaussianNB()
+        # The columns correspond to the classes in sorted order, as they appear in the attribute classes_.
         return np.round(gnb.fit(X_train, y_train).predict_proba(X_test), 3).astype(np.float64)
