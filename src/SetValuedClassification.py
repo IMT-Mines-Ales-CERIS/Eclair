@@ -63,10 +63,9 @@ class SetValuedClassification:
         pred = []
         for i in range (self._nb_samples):
             focals, masses = Utils.ProbabilityToBelief(self._masses[i], self._distinct_relabeled_classes)
-            bel, pl, pig = Utils.GetBeliefPlausibility(focals, masses, self._initial_nb_classes) # TODO : Aucun des éléments utilisés ?
             gain = []
             for j in range(len(focals)):
-                gain_tmp=0.0
+                gain_tmp = 0.0
                 # TODO : change A et B (signification).
                 A = Utils.BinaryToClass(Utils.IntegerToBinary(focals[j], self._initial_nb_classes))
                 for k in range(len(focals)):

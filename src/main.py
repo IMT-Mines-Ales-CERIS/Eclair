@@ -199,7 +199,8 @@ if __name__ == '__main__':
 
     X, y = load_iris(return_X_y = True)
 
-    accuracy = BasicExample(X, y)
+    # accuracy = BasicExample(X, y)
+    accuracy = LeaveOneOut(X, y)
     # accuracy = OptimizeLeaveOneOut(X, y)
 
     print(f'\nEvaluation: {accuracy}')
