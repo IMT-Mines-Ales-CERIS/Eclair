@@ -79,3 +79,5 @@ class SetValuedClassification:
         return pred
 
 
+    def intervalCriterion(self):
+        pass
